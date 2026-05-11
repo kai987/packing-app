@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Packing Multilingual",
+    "slug": "packing-multilingual",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "packingmultilingual",
+    "userInterfaceStyle": "light",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.packingmultilingual.app"
+    },
+    "android": {
+      "package": "com.packingmultilingual.app",
+      "backgroundColor": "#f4f5f0"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Packing Multilingual",
+      "shortName": "Packing"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}
