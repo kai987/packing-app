@@ -25,6 +25,9 @@
       "name": "Packing Multilingual",
       "shortName": "Packing"
     },
+    "experiments": {
+      "baseUrl": "/packing-app"
+    },
     "plugins": [
       "expo-asset"
     ]
