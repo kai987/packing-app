@@ -26,7 +26,10 @@ export type Carton = {
   service: string
   inner: Dimensions
   outer?: Dimensions
+  // Grams; null means the weight limit has not been verified.
   maxWeight: number | null
+  // Reference volumetric weight in grams, independent of the weight limit.
+  volumetricWeight: number | null
   priceYen?: number
   note: string
 }
@@ -56,6 +59,7 @@ export type PackedPlacement = {
   category: string
   color: string
   useItemWrap: boolean
+  contentSize: Dimensions
   x: number
   y: number
   z: number
@@ -171,9 +175,13 @@ type PlacementCandidate = {
   x: number
   y: number
   z: number
-  orientation: Dimensions
+  orientation: PackingOrientation
   score: number
   rowDepthDelta: number
+}
+
+type PackingOrientation = Dimensions & {
+  contentSize: Dimensions
 }
 
 export type PackingStrategy = 'compact' | 'stable'
@@ -311,7 +319,6 @@ function buildRecommendationsFromUnits({
     return []
   }
 
-  const itemVolume = units.reduce((sum, unit) => sum + volume(unit.size), 0)
   const totalWeight = units.reduce((sum, unit) => sum + unit.weight, 0)
   const recommendations: Recommendation[] = []
 
@@ -345,13 +352,17 @@ function buildRecommendationsFromUnits({
         continue
       }
 
-      const packed = packUnits(units, effectiveInner, strategy)
+      const packed = packUnits(units, effectiveInner, strategy, cushion)
 
       if (!packed) {
         continue
       }
 
       const scoreProfile = getStrategyScoreProfile(strategy)
+      const itemVolume = packed.placements.reduce(
+        (sum, placement) => sum + volume(placement),
+        0,
+      )
       const effectiveVolume = volume(effectiveInner)
       const emptyVolume = Math.max(effectiveVolume - itemVolume, 0)
       const topEmptyHeight = getTopEmptyHeight({
@@ -512,7 +523,7 @@ export function formatPackingStrategy(
 
 export type DisplayItemWrapKind = 'wrap' | 'paper-fill'
 
-export function getDisplayItemWrapPadding(cushion: CushionProfile) {
+export function getItemWrapPadding(cushion: CushionProfile) {
   return {
     side: clamp(Math.round(cushion.sidePadding * 0.55), 2, 6),
     vertical: clamp(
@@ -832,6 +843,7 @@ function buildRecommendationReasons({
       `${carton.code} 的有效内尺寸为 ${effectiveInnerText}。`,
       `即使使用 ${cushion.name}，仍可确保 ${fillRateText} 的填充率。`,
       `${layerSummary} 总重量为 ${totalWeightText}。`,
+      ...(carton.maxWeight === null ? ['纸箱和配送服务的重量上限未确认。'] : []),
       `箱底整体铺设了 ${bottomFillText} 的填充材。`,
       `空余体积为 ${emptyVolumeText}，建议追加填充材 ${recommendedVoidFillText}，约 ${voidFillUnits} 个单位。`,
       `顶部空余高度为 ${topEmptyHeightText}，其中建议顶部填充 ${topVoidFillHeightText}，未使用高度为 ${unusedTopHeightText}。`,
@@ -850,6 +862,7 @@ function buildRecommendationReasons({
       `The effective inner dimensions of ${carton.code} are ${effectiveInnerText}.`,
       `Even with ${cushion.name}, the layout keeps a fill rate of ${fillRateText}.`,
       `${layerSummary} Total shipment weight is ${totalWeightText}.`,
+      ...(carton.maxWeight === null ? ['Carton and shipping-service weight limits are unverified.'] : []),
       `The carton base is fully covered with ${bottomFillText} of fill material.`,
       `Empty volume is ${emptyVolumeText}, and the suggested extra void fill is ${recommendedVoidFillText}, or about ${voidFillUnits} units.`,
       `Top empty height is ${topEmptyHeightText}; suggested top fill is ${topVoidFillHeightText}; unused height is ${unusedTopHeightText}.`,
@@ -867,6 +880,7 @@ function buildRecommendationReasons({
     `${carton.code} の有効内寸は ${effectiveInnerText} です。`,
     `${cushion.name} を使っても ${fillRateText} の充填率を確保します。`,
     `${layerSummary} 総重量は ${totalWeightText} です。`,
+    ...(carton.maxWeight === null ? ['箱・配送サービスの重量上限は未確認です。'] : []),
     `箱底全体には ${bottomFillText} の充填材を敷いています。`,
     `空き容積は ${emptyVolumeText}、推奨する追加充填材は ${recommendedVoidFillText} / 目安 ${voidFillUnits} ユニットです。`,
     `上部空き高さは ${topEmptyHeightText}、そのうち推奨する上面充填は ${topVoidFillHeightText}、未使用高さは ${unusedTopHeightText} です。`,
@@ -928,6 +942,7 @@ function packUnits(
   units: OrderUnit[],
   bounds: Dimensions,
   strategy: PackingStrategy,
+  cushion: CushionProfile,
 ) {
   const layers: LayerFrame[] = []
   const placements: PackedPlacement[] = []
@@ -939,6 +954,7 @@ function packUnits(
       placements,
       bounds,
       strategy,
+      cushion,
       allowNewLayer: false,
     })
 
@@ -949,6 +965,7 @@ function packUnits(
         placements,
         bounds,
         strategy,
+        cushion,
         allowNewLayer: true,
       })
     }
@@ -1000,6 +1017,7 @@ function packUnits(
       category: unit.category,
       color: unit.color,
       useItemWrap: unit.useItemWrap,
+      contentSize: bestCandidate.orientation.contentSize,
       x: bestCandidate.x,
       y: bestCandidate.y,
       z: bestCandidate.z,
@@ -1021,6 +1039,7 @@ function findBestPlacementCandidate({
   placements,
   bounds,
   strategy,
+  cushion,
   allowNewLayer,
 }: {
   unit: OrderUnit
@@ -1028,11 +1047,12 @@ function findBestPlacementCandidate({
   placements: PackedPlacement[]
   bounds: Dimensions
   strategy: PackingStrategy
+  cushion: CushionProfile
   allowNewLayer: boolean
 }) {
   let bestCandidate: PlacementCandidate | null = null
 
-  for (const orientation of getOrientations(unit, strategy)) {
+  for (const orientation of getOrientations(unit, strategy, cushion)) {
     const candidate = findPlacementCandidate({
       layers,
       placements,
@@ -1090,7 +1110,7 @@ function findPlacementCandidate({
   layers: LayerFrame[]
   placements: PackedPlacement[]
   bounds: Dimensions
-  orientation: Dimensions
+  orientation: PackingOrientation
   fragility: Product['fragility']
   strategy: PackingStrategy
   productId: string
@@ -1389,16 +1409,35 @@ function expandRowDepth({
   }
 }
 
-function getOrientations(unit: OrderUnit, strategy: PackingStrategy): Dimensions[] {
-  const { length, width, height } = unit.size
-  const options: Dimensions[] = [
-    { length, width, height },
-    { length, width: height, height: width },
-    { length: width, width: length, height },
-    { length: width, width: height, height: length },
-    { length: height, width: length, height: width },
-    { length: height, width, height: length },
+function getOrientations(
+  unit: OrderUnit,
+  strategy: PackingStrategy,
+  cushion: CushionProfile,
+): PackingOrientation[] {
+  const padding = getItemWrapPadding(cushion)
+  const wrapPadding = unit.useItemWrap
+    ? { length: padding.side, width: padding.side, height: padding.vertical }
+    : { length: 0, width: 0, height: 0 }
+  const axes: Array<[keyof Dimensions, keyof Dimensions, keyof Dimensions]> = [
+    ['length', 'width', 'height'],
+    ['length', 'height', 'width'],
+    ['width', 'length', 'height'],
+    ['width', 'height', 'length'],
+    ['height', 'length', 'width'],
+    ['height', 'width', 'length'],
   ]
+
+  // Rotate the product and its wrapping together so the occupied volume stays constant.
+  const options = axes.map(([length, width, height]) => ({
+    length: unit.size[length] + wrapPadding[length] * 2,
+    width: unit.size[width] + wrapPadding[width] * 2,
+    height: unit.size[height] + wrapPadding[height] * 2,
+    contentSize: {
+      length: unit.size[length],
+      width: unit.size[width],
+      height: unit.size[height],
+    },
+  }))
 
   const unique = Array.from(
     new Map(options.map((option) => [dimensionKey(option), option])).values(),

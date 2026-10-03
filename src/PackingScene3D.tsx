@@ -21,7 +21,6 @@ import {
   LAYER_SEPARATOR_HEIGHT,
   buildVoidFillBlocks,
   getDisplayItemWrapKind,
-  getDisplayItemWrapPadding,
   type Recommendation,
 } from '@/packing'
 
@@ -261,7 +260,6 @@ const PackingMeshes = memo(function PackingMeshes({
     [recommendation],
   )
   const itemWrapKind = getDisplayItemWrapKind(recommendation.cushion)
-  const itemWrapPadding = getDisplayItemWrapPadding(recommendation.cushion)
   const maxSize = Math.max(dims.cartonX, dims.cartonY, dims.cartonZ)
   const sideSpan = Math.max(dims.cartonZ - dims.sidePadding * 2, 0)
   const sideHeight = Math.max(
@@ -487,29 +485,9 @@ const PackingMeshes = memo(function PackingMeshes({
             recommendation.bottomFillHeight + placement.z,
           )
           const hasItemWrap = placement.useItemWrap
-          const sideWrap = hasItemWrap
-            ? mmToSceneUnits(
-                Math.min(
-                  itemWrapPadding.side,
-                  placement.length * 0.18,
-                  placement.width * 0.18,
-                ),
-              )
-            : 0
-          const verticalWrap = hasItemWrap
-            ? mmToSceneUnits(
-                Math.min(itemWrapPadding.vertical, placement.height * 0.18),
-              )
-            : 0
-          const coreHeight = hasItemWrap
-            ? Math.max(height - verticalWrap * 2, height * 0.58)
-            : height
-          const coreLength = hasItemWrap
-            ? Math.max(length - sideWrap * 2, length * 0.58)
-            : length
-          const coreWidth = hasItemWrap
-            ? Math.max(width - sideWrap * 2, width * 0.58)
-            : width
+          const coreHeight = mmToSceneUnits(placement.contentSize.height)
+          const coreLength = mmToSceneUnits(placement.contentSize.length)
+          const coreWidth = mmToSceneUnits(placement.contentSize.width)
           const position = getBlockPosition({
             cartonX: dims.cartonX,
             cartonZ: dims.cartonZ,

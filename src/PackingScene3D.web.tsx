@@ -4,7 +4,6 @@ import {
   LAYER_SEPARATOR_HEIGHT,
   buildVoidFillBlocks,
   getDisplayItemWrapKind,
-  getDisplayItemWrapPadding,
   type Recommendation,
 } from '@/packing'
 
@@ -118,7 +117,6 @@ function buildPackingGroup(recommendation: Recommendation) {
   const group = new THREE.Group()
   const voidFillBlocks = buildVoidFillBlocks(recommendation)
   const itemWrapKind = getDisplayItemWrapKind(recommendation.cushion)
-  const itemWrapPadding = getDisplayItemWrapPadding(recommendation.cushion)
   const sideSpan = Math.max(dims.cartonZ - dims.sidePadding * 2, 0)
   const sideHeight = Math.max(
     dims.cartonY - dims.topPadding - dims.bottomPadding,
@@ -327,29 +325,9 @@ function buildPackingGroup(recommendation: Recommendation) {
     const y = mmToSceneUnits(recommendation.cushion.sidePadding + placement.y)
     const z = mmToSceneUnits(recommendation.bottomFillHeight + placement.z)
     const hasItemWrap = placement.useItemWrap
-    const sideWrap = hasItemWrap
-      ? mmToSceneUnits(
-          Math.min(
-            itemWrapPadding.side,
-            placement.length * 0.18,
-            placement.width * 0.18,
-          ),
-        )
-      : 0
-    const verticalWrap = hasItemWrap
-      ? mmToSceneUnits(
-          Math.min(itemWrapPadding.vertical, placement.height * 0.18),
-        )
-      : 0
-    const coreHeight = hasItemWrap
-      ? Math.max(height - verticalWrap * 2, height * 0.58)
-      : height
-    const coreLength = hasItemWrap
-      ? Math.max(length - sideWrap * 2, length * 0.58)
-      : length
-    const coreWidth = hasItemWrap
-      ? Math.max(width - sideWrap * 2, width * 0.58)
-      : width
+    const coreHeight = mmToSceneUnits(placement.contentSize.height)
+    const coreLength = mmToSceneUnits(placement.contentSize.length)
+    const coreWidth = mmToSceneUnits(placement.contentSize.width)
     const position = getBlockPosition({
       cartonX: dims.cartonX,
       cartonZ: dims.cartonZ,

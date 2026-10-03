@@ -41,7 +41,6 @@ import {
   formatVolumeLiters,
   formatWeight,
   getDisplayItemWrapKind,
-  getDisplayItemWrapPadding,
   recommendPacking,
   recommendSplitPacking,
   type PackedLayer,
@@ -603,7 +602,6 @@ function LayerBoard({
   locale: SupportedLocale
   labels: PlanText
 }) {
-  const itemWrapPadding = getDisplayItemWrapPadding(recommendation.cushion)
   const itemWrapKind = getDisplayItemWrapKind(recommendation.cushion)
   const voidBlocks = buildVoidFillBlocks(recommendation).filter(
     (block) => (block.layerIndex ?? -1) === layer.index,
@@ -690,19 +688,12 @@ function LayerBoard({
           const heightRate = placement.width / recommendation.carton.inner.width
           const hasItemWrap = placement.useItemWrap
           const insetXPercent = hasItemWrap
-            ? Math.min((itemWrapPadding.side / placement.length) * 100, 18)
+            ? ((placement.length - placement.contentSize.length) / (placement.length * 2)) * 100
             : 0
           const insetYPercent = hasItemWrap
-            ? Math.min((itemWrapPadding.side / placement.width) * 100, 18)
+            ? ((placement.width - placement.contentSize.width) / (placement.width * 2)) * 100
             : 0
-          const placementDimensions = formatDimensions(
-            {
-              length: placement.length,
-              width: placement.width,
-              height: placement.height,
-            },
-            locale,
-          )
+          const placementDimensions = formatDimensions(placement.contentSize, locale)
           const canShowDetails = widthRate * heightRate >= 0.08
 
           return (
@@ -1735,9 +1726,15 @@ export default function App() {
                     <Text style={styles.metaText}>
                       {text.catalog.maxWeight}:{' '}
                       {carton.maxWeight === null
-                        ? text.catalog.noWeightLimit
+                        ? text.catalog.unknownWeightLimit
                         : formatWeight(carton.maxWeight, locale)}
                     </Text>
+                    {carton.volumetricWeight !== null ? (
+                      <Text style={styles.metaText}>
+                        {text.catalog.volumetricWeight}:{' '}
+                        {formatWeight(carton.volumetricWeight, locale)}
+                      </Text>
+                    ) : null}
                     {carton.priceYen ? (
                       <Text style={styles.metaText}>
                         {text.catalog.materialPrice}:{' '}
