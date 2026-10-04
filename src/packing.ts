@@ -111,6 +111,7 @@ export type Recommendation = {
   placements: PackedPlacement[]
   layers: PackedLayer[]
   reasons: string[]
+  voidFillBlocks?: VoidFillBlock[]
 }
 
 export type SplitPackingBox = {
@@ -621,6 +622,7 @@ export function getSplitRecommendationReasons(
 }
 
 export function buildVoidFillBlocks(recommendation: Recommendation): VoidFillBlock[] {
+  if (recommendation.voidFillBlocks) return recommendation.voidFillBlocks
   return buildVoidFillBlocksFromLayout({
     effectiveInner: recommendation.effectiveInner,
     placements: recommendation.placements,

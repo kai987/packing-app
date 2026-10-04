@@ -19,6 +19,7 @@ import {
   products as packingProducts,
 } from '@/data'
 import PackingScene3D from '@/PackingScene3D'
+import usePackingEngine from '@/usePackingEngine'
 import {
   getAppText,
   getLocalizedCatalog,
@@ -41,8 +42,6 @@ import {
   formatVolumeLiters,
   formatWeight,
   getDisplayItemWrapKind,
-  recommendPacking,
-  recommendSplitPacking,
   type PackedLayer,
   type PackingStrategy,
   type Product,
@@ -937,28 +936,26 @@ export default function App() {
       new Map(orderLines.map((line) => [line.productId, line.useItemWrap] as const)),
     [orderLines],
   )
-  const baseRecommendations = useMemo(
-    () =>
-      recommendPacking({
-        products: editableProducts,
-        cartons: packingCartons,
-        cushions: packingCushions,
-        orderLines,
-        strategy: packingStrategy,
-      }).slice(0, 3),
+  const packingInput = useMemo(
+    () => ({
+      products: editableProducts,
+      cartons: packingCartons,
+      cushions: packingCushions,
+      orderLines,
+      strategy: packingStrategy,
+      limit: 3,
+    }),
     [editableProducts, orderLines, packingStrategy],
   )
-  const baseSplitRecommendations = useMemo(
-    () =>
-      recommendSplitPacking({
-        products: editableProducts,
-        cartons: packingCartons,
-        cushions: packingCushions,
-        orderLines,
-        strategy: packingStrategy,
-      }).slice(0, 3),
-    [editableProducts, orderLines, packingStrategy],
-  )
+  const {
+    recommendations: baseRecommendations,
+    splitRecommendations: baseSplitRecommendations,
+    isComputing,
+    error: packingError,
+  } = usePackingEngine(packingInput)
+  const calculationStatus = isComputing
+    ? text.recommendations.calculating
+    : packingError ? text.recommendations.calculationError : null
   const recommendations = useMemo(
     () =>
       baseRecommendations.map((recommendation) =>
@@ -1401,7 +1398,9 @@ export default function App() {
                     : text.strategy.stableNote}
                 </Text>
 
-                {totalUnits === 0 ? (
+                {calculationStatus ? (
+                  <Text accessibilityLiveRegion="polite" style={styles.strategyNote}>{calculationStatus}</Text>
+                ) : totalUnits === 0 ? (
                   <EmptyState
                     title={text.recommendations.emptyNoItemsTitle}
                     body={text.recommendations.emptyNoItemsBody}
@@ -1543,6 +1542,8 @@ export default function App() {
                   </View>
                 ))}
               </>
+            ) : calculationStatus ? (
+              <Text accessibilityLiveRegion="polite" style={styles.strategyNote}>{calculationStatus}</Text>
             ) : (
               <EmptyState
                 title={text.recommendations.emptyNoItemsTitle}
@@ -1562,7 +1563,9 @@ export default function App() {
             }
             onToggle={() => setIsComparisonCollapsed((current) => !current)}
           >
-            {bestSingleRecommendation && bestSplitRecommendation ? (
+            {calculationStatus ? (
+              <Text style={styles.strategyNote}>{calculationStatus}</Text>
+            ) : bestSingleRecommendation && bestSplitRecommendation ? (
               <>
                 <View style={[styles.comparisonGrid, isWide && styles.comparisonGridWide]}>
                   <View style={styles.comparisonCard}>
@@ -1621,7 +1624,9 @@ export default function App() {
             }
             onToggle={() => setIsSplitCollapsed((current) => !current)}
           >
-            {splitRecommendations.length === 0 ? (
+            {calculationStatus ? (
+              <Text style={styles.strategyNote}>{calculationStatus}</Text>
+            ) : splitRecommendations.length === 0 ? (
               <EmptyState title={text.split.emptyTitle} body={text.split.emptyBody} />
             ) : (
               <>

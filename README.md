@@ -33,6 +33,15 @@ Expo CLI が起動したら、ターミナルの QR コードを Expo Go また�
 
 Web で確認する場合:
 
+Web の計算エンジンをビルドするため、Rust と固定バージョンの WASM バインディング生成ツールを用意します。
+
+```bash
+rustup show
+cargo install wasm-bindgen-cli --version 0.2.114 --locked
+```
+
+`rust-toolchain.toml` が Rust 1.93.0 と `wasm32-unknown-unknown` ターゲットを指定します。iOS / Android の TypeScript 計算にはこれらのツールは不要です。
+
 ```bash
 npm run web
 ```
@@ -47,6 +56,20 @@ npm run web
 - `npm run typecheck`
 - `npm run lint`
 - `npm test`
+- `npm run test:ts`
+- `npm run test:core`
+- `npm run test:wasm`
+- `npm run benchmark`
+
+## Rust / WASM 計算エンジン
+
+Web は `packing-core` の Rust コアを WebAssembly にコンパイルし、専用 Web Worker 内で単箱推薦・分箱探索・配置・支え判定・評価・空隙計算を実行します。UI、翻訳、Three.js の描画は TypeScript のままです。元の2層制限とヒューリスティックの規則は変更していません。
+
+`npm run web` と `npm run build` は先に `npm run build:engine` を実行します。生成した Worker、JS バインディング、WASM は `public/packing-engine/` に置かれ、Expo export に含まれます。生成物と Rust の `target/` は Git 管理せず、Cargo.lock と固定ツールチェーンから再生成します。`npm start` から Web を起動する場合は、先に `npm run build:engine` を実行してください。
+
+Worker の入力は商品・箱・緩衝材・数量・包装設定・戦略、出力は既存の推薦形式です。表示用には各推薦の上位3件だけを返します。言語依存のソートは JavaScript の `localeCompare` と同じ規則を維持します。Rust が計算した空隙ブロックは俯瞰図と3D図でも再利用します。
+
+WASM のロードまたは計算が失敗した場合は同じ Worker 内の TypeScript 実装へ切り替えます。Worker 自体が利用できない・失敗する・30秒以内に応答しない場合はメインスレッドの TypeScript にフォールバックします。この最終フォールバックでは重い入力の処理中に UI が止まる可能性があります。古いリクエストの結果は表示せず、計算中は状態を表示します。iOS / Android は従来どおり TypeScript を使い、Rust のネイティブモジュールを要求しません。
 
 ## 梱包計算の前提
 
@@ -56,9 +79,9 @@ npm run web
 
 ## 検証と公開
 
-`npm test` は Node.js のテストランナーと `tsx` で梱包ロジックを検証します。包装によるサイズ超過・回転・分割梱包・重量上限・商品の重なりやはみ出し・多言語表示を確認します。
+`npm test` は既存の16項目を TypeScript と実際の WASM の両方で実行し、全候補の結果・空隙ブロックの対照、Worker 内での実行、フォールバック、古い応答の破棄を検証します。`npm run test:core` は Rust の単体テスト、`npm run benchmark` は既定の7商品について各15回のウォーム計測と Worker 初回起動・往復時間を表示します。Node 上の測定であり、ブラウザやモバイルの性能保証ではありません。
 
-GitHub Actions は PR、`main` への push、手動実行で型チェック・lint・テスト・Web buildを実行します。PRでは検証のみ行い、`main` の検証がすべて成功した場合に GitHub Pages へ公開します。
+GitHub Actions は PR、`main` への push、手動実行で Rust の整形・clippy・単体テスト、型チェック・lint・両エンジンのテスト・Web build を実行します。PRでは検証のみ行い、`main` の検証がすべて成功した場合に GitHub Pages へ公開します。
 
 ## コード構成
 

@@ -10,14 +10,21 @@ import {
 import {
   buildVoidFillBlocks,
   getRecommendationReasons,
-  recommendPacking,
-  recommendSplitPacking,
+  recommendPacking as recommendTypeScript,
+  recommendSplitPacking as recommendSplitTypeScript,
   type Carton,
   type CushionProfile,
   type Dimensions,
   type Product,
   type Recommendation,
 } from '@/packing'
+
+const rust = process.env.PACKING_TEST_ENGINE === 'rust'
+  ? (await import('./helpers/rust-engine')).computeRust : null
+const recommendPacking: typeof recommendTypeScript = input => rust
+  ? rust(input).recommendations : recommendTypeScript(input)
+const recommendSplitPacking: typeof recommendSplitTypeScript = input => rust
+  ? rust(input).splitRecommendations : recommendSplitTypeScript(input)
 
 const cushion: CushionProfile = {
   id: 'air-cap-light',

@@ -32,6 +32,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Rust and WASM binding generator
+        run: |
+          rustup show
+          cargo install wasm-bindgen-cli --version 0.2.114 --locked
+
+      - name: Rust format and lint
+        run: |
+          cargo fmt --manifest-path packing-core/Cargo.toml --check
+          cargo clippy --manifest-path packing-core/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Rust core tests
+        run: npm run test:core
+
       - name: Typecheck
         run: npm run typecheck
 
